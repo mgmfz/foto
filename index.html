@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revelar Imagem Uma Vez</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .image-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+
+        .image-card:hover:not(.revealed) {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 70px rgba(0,0,0,0.4);
+        }
+
+        .image-card.revealed {
+            cursor: not-allowed;
+        }
+
+        .image-wrapper {
+            position: relative;
+            width: 100%;
+            padding-top: 75%;
+            overflow: hidden;
+        }
+
+        .image-wrapper img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(20px);
+            transition: filter 1.5s ease;
+        }
+
+        .image-wrapper img.revealed {
+            filter: blur(0);
+        }
+
+        .image-wrapper img.locked {
+            filter: blur(20px);
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1s ease;
+            pointer-events: none;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+        }
+
+        .lock-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .overlay-text {
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .warning {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .info {
+            padding: 25px;
+            text-align: center;
+            color: #333;
+        }
+
+        .info h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .info p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .status.available {
+            background: #51cf66;
+            color: white;
+        }
+
+        .status.locked {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        /* Proteção contra print */
+        @media print {
+            .image-wrapper img {
+                filter: blur(30px) !important;
+                opacity: 0.3 !important;
+            }
+            
+            body::before {
+                content: "🚫 IMPRESSÃO BLOQUEADA";
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 48px;
+                font-weight: bold;
+                color: red;
+                z-index: 9999;
+                text-align: center;
+            }
+        }
+
+        /* Proteção contra screenshot (aviso visual) */
+        .screenshot-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 0, 0, 0.95);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 10000;
+            display: none;
+            animation: flash 0.5s infinite;
+        }
+
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="screenshot-warning" id="screenshotWarning">
+        ⚠️ TENTATIVA DE CAPTURA DETECTADA! ⚠️
+    </div>
+    
+    <div class="container">
+        <div class="image-card" id="imageCard">
+            <div class="image-wrapper">
+                <img src="https://cloud-j6gctsg3w-hack-club-bot.vercel.app/0img_20250114_084841_854.jpg" alt="Imagem misteriosa" id="revealImage">
+                <div class="overlay" id="overlay">
+                    <div class="lock-icon">🔒</div>
+                    <div class="overlay-text">Clique para revelar</div>
+                </div>
+            </div>
+            <div class="warning" id="warning" style="display: none;">
+                ⚠️ Imagem bloqueada! Você já a visualizou.
+            </div>
+            <div class="info">
+                <h1>Imagem Secreta</h1>
+                <p>Clique na imagem para revelá-la. Atenção: você só poderá ver esta imagem uma única vez!</p>
+                <div class="status available" id="status">✓ Disponível para visualização</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const card = document.getElementById('imageCard');
+        const img = document.getElementById('revealImage');
+        const overlay = document.getElementById('overlay');
+        const status = document.getElementById('status');
+        const warning = document.getElementById('warning');
+        const screenshotWarning = document.getElementById('screenshotWarning');
+        
+        let wasRevealed = false;
+        let isCurrentlyOpen = false;
+
+        // Verifica se a imagem já foi revelada antes (usando localStorage como backup)
+        const imageId = 'secret_image_revealed';
+        const alreadyRevealed = localStorage.getItem(imageId) === 'true';
+
+        // Proteção contra print (Ctrl+P, Cmd+P)
+        document.addEventListener('keydown', function(e) {
+            // Detecta Ctrl+P ou Cmd+P
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                e.preventDefault();
+                showScreenshotWarning();
+                lockImage();
+                return false;
+            }
+            
+            // Detecta Print Screen
+            if (e.key === 'PrintScreen') {
+                showScreenshotWarning();
+                // Borra temporariamente
+                img.style.filter = 'blur(50px)';
+                setTimeout(() => {
+                    if (isCurrentlyOpen) {
+                        img.style.filter = '';
+                    }
+                }, 300);
+            }
+        });
+
+        // Detecta quando o usuário tenta usar ferramentas de desenvolvedor
+        document.addEventListener('contextmenu', function(e) {
+            if (isCurrentlyOpen) {
+                e.preventDefault();
+                showScreenshotWarning();
+            }
+        });
+
+        // Detecta quando a janela perde foco (pode ser screenshot)
+        window.addEventListener('blur', function() {
+            if (isCurrentlyOpen && !wasRevealed) {
+                showScreenshotWarning();
+            }
+        });
+
+        // Proteção contra DevTools
+        const devtools = /./;
+        devtools.toString = function() {
+            if (isCurrentlyOpen) {
+                lockImage();
+            }
+        };
+        
+        function showScreenshotWarning() {
+            screenshotWarning.style.display = 'block';
+            setTimeout(() => {
+                screenshotWarning.style.display = 'none';
+            }, 2000);
+        }
+
+        // Se já foi revelada antes, bloqueia imediatamente
+        if (alreadyRevealed) {
+            wasRevealed = true;
+            img.classList.add('locked');
+            overlay.querySelector('.overlay-text').textContent = 'Imagem bloqueada';
+            overlay.querySelector('.lock-icon').textContent = '🔐';
+            warning.style.display = 'block';
+            status.textContent = '🔒 Bloqueada permanentemente';
+            status.classList.add('locked');
+            status.classList.remove('available');
+            status.style.background = '#ff6b6b';
+            card.classList.add('revealed');
+        }
+
+        card.addEventListener('click', function() {
+            // Se já foi revelada antes, não faz nada
+            if (wasRevealed) {
+                return;
+            }
+
+            // Se não está aberta, abre
+            if (!isCurrentlyOpen) {
+                isCurrentlyOpen = true;
+                img.classList.add('revealed');
+                img.classList.remove('locked');
+                overlay.classList.add('hidden');
+                card.classList.add('revealed');
+                status.textContent = '👁️ Visualizando agora';
+                status.classList.remove('available');
+                status.style.background = '#4dabf7';
+            }
+        });
+
+        // Detecta quando o usuário sai da página/aba (para mobile e desktop)
+        let lockTimeout;
+        
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isCurrentlyOpen && !wasRevealed) {
+                // Usuário saiu da aba/minimizou o app
+                lockImage();
+            }
+        });
+
+        // Para desktop: quando o mouse sai da área
+        card.addEventListener('mouseleave', function() {
+            if (isCurrentlyOpen && !wasRevealed) {
+                lockTimeout = setTimeout(() => {
+                    lockImage();
+                }, 500);
+            }
+        });
+
+        // Cancela o bloqueio se o mouse voltar rápido
+        card.addEventListener('mouseenter', function() {
+            if (lockTimeout) {
+                clearTimeout(lockTimeout);
+            }
+        });
+
+        function lockImage() {
+            wasRevealed = true;
+            
+            // Salva permanentemente que a imagem foi revelada
+            localStorage.setItem(imageId, 'true');
+            
+            // Borra a imagem novamente
+            setTimeout(() => {
+                img.classList.remove('revealed');
+                img.classList.add('locked');
+                overlay.classList.remove('hidden');
+                overlay.querySelector('.overlay-text').textContent = 'Imagem bloqueada';
+                overlay.querySelector('.lock-icon').textContent = '🔐';
+                warning.style.display = 'block';
+                status.textContent = '🔒 Bloqueada permanentemente';
+                status.classList.add('locked');
+                status.classList.remove('available');
+                status.style.background = '#ff6b6b';
+            }, 300);
+        }
+    </script>
+</body>
+</html>
